@@ -8,7 +8,7 @@ import numpy as np
 from random import randrange
 import math
 
-def steelStress(self,x, fy, eu, bsteel):
+def steelStress(x, fy, eu, bsteel):
         #Define steel:
             
         E = 200000
@@ -24,18 +24,20 @@ def steelStress(self,x, fy, eu, bsteel):
                 f = fy+bsteel*E*(abs(x)-ey)
         return f*sign
 
-def concreteStress(self,x, fc, ec0, fcu, ecu):
+def concreteStress(x, fc, ec0, fcu, ecu):
     #Define concrete here.
     #E = 1000*22*(0.1*fc)**0.3
 
     if x>=0:
          f=0
-    elif x<=-ecu:
+         
+    if x<=-ecu:
          f=-0
         
-    elif x>-ecu and x<=-ec0:
+    if x>-ecu and x<=-ec0:
          f = -fcu + (abs(ecu)-abs(x))*(fc-fcu)/(ec0-ecu)
-    elif x>-ec0 and x<0:
+         
+    if x>-ec0 and x<0:
          f = -fc*(2*abs(x)/ec0-(abs(x)/ec0)*(abs(x)/ec0))
     return f
     
@@ -46,13 +48,66 @@ def epsilon(h, x, yi, etop):
     return eci
     
 
-def momentCurvature(self, section, coreSection, steelBars, concreteUC, concreteC, steel, N, steps, tol, maxIterations, noFibresCore, noFibresCover):
-    #section = coordinates of the RECTANGULAR cross section [[x1, y1], [x2, y2], ...]
-    #coreSection = coordinates of the cross section of confined core [[x1, y1], [x2, y2], ...]
-    #steelBars = coordinates and area of the bar [[x1, y1, As1], [x2, y2, As2], ...]
-    #concreteUC = unconfined concrete [fc, ec0, fcu, ecu]
-    #concreteC = confined concrete [fc, ec0, fcu, ecu,]
-    #steel = steel properties [fy, b, eu]
+def momentCurvature(section, coreSection, steelBars, concreteUC, concreteC, steel, N, steps, tol, maxIterations, noFibresCore, noFibresCover):
+    '''
+    Calculates the moment - curvature relationship of a rectangular reinforced concrete section.
+
+    Parameters
+    ----------
+    section : List of lists of floats
+        Coordinates of the RECTANGULAR cross section [[x1, y1], [x2, y2], ...].
+    coreSection : List of lists of floats
+        Coordinates of the cross section of confined core [[x1, y1], [x2, y2], ...].
+    steelBars : List of lists of floats
+        Coordinates and area of the bar [[x1, y1, As1], [x2, y2, As2], ...].
+    concreteUC : List of floats
+        Cnconfined concrete [fc, ec0, fcu, ecu].
+    concreteC : List of floats
+        confined concrete [fc, ec0, fcu, ecu,].
+    steel : List of floats
+        Steel properties [fy, b, eu].
+    N : float
+        Axial load in kN. Positive = compression.
+    steps : int
+        Number of iteration steps.
+    tol : float
+        Tolerance.
+    maxIterations : int
+        Maximum number of iterations.
+    noFibresCore : int
+        Number of fibres in the core.
+    noFibresCover : int
+        Number of fibres in the cover.
+
+    Returns
+    -------
+    k : list
+        Curvatures.
+    M : list
+        Moments.
+    outFS : list
+        Forces in steel reinforcement.
+    outCORE : list
+        Forces in the core.
+    outCOVER : list
+        Forces in the cover.
+    crushing : list
+        Crushing point coordinates (cover).
+    crushingCore : list
+        Crushing point coordinates (core).
+    yielding : list
+        Yielding point coordinates.
+    rupture : list
+        Steel rupture point coordinates.
+    dropped : list
+        Coordinates of "dropped".
+    converged : Boolean
+        True if the analysis converged.
+    convergedSteps : int
+        Value of convergedSteps.
+
+    '''
+
     #N = axial load in kN. Positive = compression.
     
     layers = 2*noFibresCover+noFibresCore
@@ -174,8 +229,8 @@ def momentCurvature(self, section, coreSection, steelBars, concreteUC, concreteC
                 esi = epsilon(h, x, yi, etop)
                 
                 #correct for concrete displaced by steel:
-                fcdisplaced = concreteStress(self, esi, fcC, ec0C, fcuC, ecuC)
-                fsi = steelStress(self, esi, fy, euSteel, bSteel) + fcdisplaced
+                fcdisplaced = concreteStress(esi, fcC, ec0C, fcuC, ecuC)
+                fsi = steelStress(esi, fy, euSteel, bSteel) + fcdisplaced
                 
                 FS+=fsi*Asi
                 
@@ -194,10 +249,10 @@ def momentCurvature(self, section, coreSection, steelBars, concreteUC, concreteC
                 
                 #Newton-Raphson quantities:
                 esiNR = epsilon(h, x+dx, yi, etop)
-                fsiNR = steelStress(self, esiNR, fy, euSteel, bSteel)
+                fsiNR = steelStress(esiNR, fy, euSteel, bSteel)
                 FSNRm+=fsiNR*Asi
                 esiNR = epsilon(h, x-dx, yi, etop)
-                fsiNR = steelStress(self, esiNR, fy, euSteel, bSteel)
+                fsiNR = steelStress(esiNR, fy, euSteel, bSteel)
                 FSNRd+=fsiNR*Asi
                 
             #concrete confined:
@@ -207,7 +262,7 @@ def momentCurvature(self, section, coreSection, steelBars, concreteUC, concreteC
                 yi = c + fibre*tFibreCore+0.5*tFibreCore
                 eci = epsilon(h, x, yi, etop)
                 #print("yi =", yi, "kshq eci = ", eci, "ndersa x =", x)
-                fci = concreteStress(self, eci, fcC, ec0C, fcuC, ecuC)
+                fci = concreteStress(eci, fcC, ec0C, fcuC, ecuC)
                 #print(eci, fci, "epsilon, fcore")
                 FCCORE += fci*Aci
                 krahu = yi-h/2
@@ -218,10 +273,10 @@ def momentCurvature(self, section, coreSection, steelBars, concreteUC, concreteC
                 
                 #Newton-Raphson quantities:
                 eciNR = epsilon(h, x+dx, yi, etop)
-                fciNR = concreteStress(self, eciNR, fcC, ec0C, fcuC, ecuC)
+                fciNR = concreteStress(eciNR, fcC, ec0C, fcuC, ecuC)
                 FCCORENRm += fciNR*Aci   
                 eciNR = epsilon(h, x-dx, yi, etop)
-                fciNR = concreteStress(self, eciNR, fcC, ec0C, fcuC, ecuC)
+                fciNR = concreteStress(eciNR, fcC, ec0C, fcuC, ecuC)
                 FCCORENRd += fciNR*Aci 
                 
             #concrete unconfined:
@@ -251,7 +306,7 @@ def momentCurvature(self, section, coreSection, steelBars, concreteUC, concreteC
                         yi = noFibresCover*tFibreCover+noFibresCore*tFibreCore + (fibre-noFibresCore-noFibresCover)*tFibreCover+0.5*tFibreCover
                     
                 eci = epsilon(h, x, yi, etop)
-                fci = concreteStress(self, eci, fcUC, ec0UC, fcuUC, ecuUC)
+                fci = concreteStress(eci, fcUC, ec0UC, fcuUC, ecuUC)
                 #print(eci, fci, "epsilon, fcover")
                 FCCOVER += fci*Aci
                 strainCover.append(eci)
@@ -265,10 +320,10 @@ def momentCurvature(self, section, coreSection, steelBars, concreteUC, concreteC
                 
                 #Newton-Raphson quantities:
                 eciNR = epsilon(h, x+dx, yi, etop)
-                fciNR = concreteStress(self, eciNR, fcUC, ec0UC, fcuUC, ecuUC)
+                fciNR = concreteStress(eciNR, fcUC, ec0UC, fcuUC, ecuUC)
                 FCCOVERNRm += fciNR*Aci
                 eciNR = epsilon(h, x-dx, yi, etop)
-                fciNR = concreteStress(self, eciNR, fcUC, ec0UC, fcuUC, ecuUC)
+                fciNR = concreteStress(eciNR, fcUC, ec0UC, fcuUC, ecuUC)
                 FCCOVERNRd += fciNR*Aci
 
                 
@@ -341,8 +396,56 @@ def momentCurvature(self, section, coreSection, steelBars, concreteUC, concreteC
     return k, M, outFS, outCORE, outCOVER, crushing, crushingCore, yielding, rupture, dropped, converged, convergedSteps
 
 
-
-            
+if __name__ == "__main__":
+    
+    import matplotlib.pyplot as plt
+    
+    #Input data:
+    MEd = 17.98 #kN
+    b = 290 #mm
+    h = 150 #mm
+    
+    As = 170*5 #mm^2
+    # As = 2560
+    fc = 0.85*25/1.5
+    fy = 235/1.15
+    
+    section = [[0,0],
+               [b, 0],
+               [b,h],
+               [0,h]]
+    
+    coreSection = [[10,10],
+                   [b-10, 10],
+                   [b-10,h-10],
+                   [10,h-10]]
+    
+    steelBars = [[b/2, 0, As]]
+    concreteUC = [fc, 2.1/1000, 0.85*fc, 3.5/1000]
+    concreteC = [fc, 2.1/1000, 0.85*fc, 3.5/1000]
+    steel = [fy, 0.000001, 0.02]
+    
+    N = 0 #kN
+    
+    #Calculate the moment-curvature:
+    k, M, outFS, outCORE, outCOVER, crushing, crushingCore, yielding, rupture, dropped, converged, convergedSteps = momentCurvature(section, coreSection, steelBars, concreteUC, concreteC, steel, N, 50, 1e-5, 100, 100, 10)
+    
+    #Create a figure:
+    fig = plt.figure()
+    ax = plt.gca()
+    
+    #plt.rcParams['text.usetex'] = True
+    plt.plot(k, M) 
+    
+    plt.text(0.4e-4, MEd-1.5, f"MEd = {MEd:.02f} kNm")
+    plt.grid()
+    plt.xlabel("Curvature"); plt.ylabel("Moment (kNm)")
+    plt.ylim(0, 40)
+    plt.xlim(0, 1e-4)
+    ax.ticklabel_format(axis='x', style='sci', scilimits=(-3, 3), useOffset=False)
+    plt.title(f"As={As:.01f}mm2 /m, fyd={fy:.01f}MPa, fcd={fc:.01f}MPa")
+    plt.plot([0,2e-4], [MEd, MEd], linestyle = "--", color = "black")
+    plt.show()
 
 
         
